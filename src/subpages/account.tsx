@@ -41,64 +41,10 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
     <Wrapper>
       <h1>Account Details</h1>
       <p>
-        Account Number: <b>{hash}</b>
+        Address: <b>{hash}</b>
       </p>
 
       <h2>Transactions count</h2>
-
-      <TransactionsByAccountComponent
-        variables={{ offset: txOffset, limit: 101, involvedAddress: hash }}>
-        {({ data, loading, error }) => {
-          if (error) {
-            console.error(error);
-            return <p>{error.message}</p>;
-          }
-
-          if (loading) {
-            return (
-              <Ul>
-                <li>Signed Transaction: Loading…</li>
-                <li>Involved Transaction: Loading…</li>
-                <li>missingNonces: Loading…</li>
-              </Ul>
-            );
-          } else {
-            const transactions =
-              data && data.chainQuery.transactionQuery && data.chainQuery.transactionQuery.transactions
-                ? data.chainQuery.transactionQuery.transactions
-                : null;
-
-            if (transactions === null) throw Error('transactions query failed');
-
-            const {
-              signedTransactions,
-              involvedTransactions,
-              missingNonces,
-            } = splitTransactions(transactions, hash);
-
-            return (
-              <Ul>
-                <li>
-                  Signed Transaction:{' '}
-                  {signedTransactions.length === 101
-                    ? '100+'
-                    : signedTransactions.length}
-                </li>
-                <li>
-                  Involved Transaction:{' '}
-                  {involvedTransactions.length === 101
-                    ? '100+'
-                    : involvedTransactions.length}
-                </li>
-                <li>
-                  missingNonces:{' '}
-                  {missingNonces.length === 101 ? '100+' : missingNonces.length}
-                </li>
-              </Ul>
-            );
-          }
-        }}
-      </TransactionsByAccountComponent>
 
       <TransactionsByAccountComponent
         variables={{ offset: txOffset, limit, involvedAddress: hash }}>
@@ -111,31 +57,53 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
           if (loading) {
             return (
               <>
+                <Ul>
+                  <li>Signed Transaction: Loading…</li>
+                  <li>Involved Transaction: Loading…</li>
+                </Ul>
                 <OffsetSwitch disable={{ older: true, newer: true }} />
                 <TransactionListWrap loading={true} />
               </>
             );
           } else {
-            const transactions =
-              data && data.chainQuery.transactionQuery && data.chainQuery.transactionQuery.transactions
-                ? data.chainQuery.transactionQuery.transactions
+            const involvedTransactions =
+              data &&
+              data.chainQuery.transactionQuery &&
+              data.chainQuery.transactionQuery.involvedTransactions
+                ? data.chainQuery.transactionQuery.involvedTransactions
+                : null;
+            const signedTransactions =
+              data &&
+              data.chainQuery.transactionQuery &&
+              data.chainQuery.transactionQuery.signedTransactions
+                ? data.chainQuery.transactionQuery.signedTransactions
                 : null;
 
-            if (transactions === null) throw Error('transactions query failed');
-
-            const {
-              signedTransactions,
-              involvedTransactions,
-              missingNonces,
-            } = splitTransactions(transactions, hash);
+            if (involvedTransactions === null || signedTransactions === null) {
+              throw Error('transactions query failed');
+            }
 
             return (
               <>
+                <Ul>
+                  <li>
+                    Signed Transaction:{' '}
+                    {signedTransactions.length === limit
+                      ? (limit - 1).toString() + '+'
+                      : signedTransactions.length}
+                  </li>
+                  <li>
+                    Involved Transaction:{' '}
+                    {involvedTransactions.length === limit
+                      ? (limit - 1).toString() + '+'
+                      : involvedTransactions.length}
+                  </li>
+                </Ul>
                 <OffsetSwitch
                   olderHandler={txOlderHandler}
                   newerHandler={txNewerHandler}
                   disable={{
-                    older: loading || transactions.length < limit,
+                    older: loading || new Set(signedTransactions.map(tx => tx.id).concat(involvedTransactions.map(tx => tx.id))).size < limit,
                     newer: loading || txOffset === 0,
                   }}
                 />
@@ -143,7 +111,6 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
                   loading={false}
                   signed={signedTransactions}
                   involved={involvedTransactions}
-                  missingNonces={missingNonces}
                 />
               </>
             );
@@ -162,7 +129,9 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
           let blocks = null;
           if (!loading) {
             blocks =
-              data && data.chainQuery.blockQuery && data.chainQuery.blockQuery.blocks
+              data &&
+              data.chainQuery.blockQuery &&
+              data.chainQuery.blockQuery.blocks
                 ? (data.chainQuery.blockQuery.blocks as Block[])
                 : null;
           }
@@ -203,14 +172,12 @@ export default AccountPage;
 interface TransactionListWrapProps {
   signed?: TransactionCommonFragment[];
   involved?: TransactionCommonFragment[];
-  missingNonces?: number[];
   loading: boolean;
 }
 
 const TransactionListWrap: React.FC<TransactionListWrapProps> = ({
   signed,
   involved,
-  missingNonces,
   loading,
 }) => (
   <>
@@ -226,16 +193,6 @@ const TransactionListWrap: React.FC<TransactionListWrapProps> = ({
       transactions={involved ? involved : null}
       notFoundMessage={'No Involved Transactions'}
     />
-    <h2>Missing Nonces{counter(missingNonces)}</h2>
-    {missingNonces ? (
-      missingNonces.length > 0 ? (
-        missingNonces.map(nonce => <p key={nonce}>{nonce}</p>)
-      ) : (
-        <div>No missing nonces.</div>
-      )
-    ) : (
-      'Loading…'
-    )}
   </>
 );
 
@@ -266,33 +223,3 @@ const BlockList: React.FC<BlockListProps> = ({ blocks, ...props }) => (
     onItemInvoked={(block: Block) => navigate(`/search/?${block.hash}`)}
   />
 );
-
-function splitTransactions(
-  transactions: TransactionCommonFragment[],
-  hash: string
-) {
-  const signedTransactions: TransactionCommonFragment[] = [],
-    involvedTransactions: TransactionCommonFragment[] = [];
-  transactions.forEach(tx => {
-    if (tx.signer === hash) {
-      signedTransactions.push(tx);
-    } else {
-      involvedTransactions.push(tx);
-    }
-  });
-
-  const missingNonces: number[] = [];
-  for (let i = 1; i < signedTransactions.length; ++i) {
-    const prevNonce = signedTransactions[i - 1].nonce;
-    const nonce = signedTransactions[i].nonce;
-    if (prevNonce === nonce - 1) continue;
-    for (
-      let missingNonce = prevNonce + 1;
-      missingNonce < nonce;
-      ++missingNonce
-    ) {
-      missingNonces.push(missingNonce);
-    }
-  }
-  return { signedTransactions, involvedTransactions, missingNonces };
-}
