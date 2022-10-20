@@ -5,6 +5,7 @@ import { GRAPHQL_ENDPOINTS } from '../misc/graphQLEndPoint';
 
 export interface IndexPageProps {
   location: Location;
+  pageContext: any;
 }
 
 const IndexPage: React.FC<IndexPageProps> = () => (

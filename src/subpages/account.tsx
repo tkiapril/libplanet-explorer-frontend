@@ -10,6 +10,7 @@ import {
   TransactionsByAccountComponent,
   Block,
   BlockListComponent,
+  Transaction,
   TransactionCommonFragment,
 } from '../generated/graphql';
 
@@ -28,7 +29,7 @@ const Ul = styled.ul`
   padding: 0;
 `;
 
-const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
+const AccountPage: React.FC<AccountPageProps> = ({ location, ...props }) => {
   const hash = useQueryString(location)[0].slice(0, 42);
 
   const [txOffset, txOlderHandler, txNewerHandler] = useOffset(location, 'tx');
@@ -62,7 +63,10 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
                   <li>Involved Transaction: Loading…</li>
                 </Ul>
                 <OffsetSwitch disable={{ older: true, newer: true }} />
-                <TransactionListWrap loading={true} />
+                <TransactionListWrap
+                  loading={true}
+                  endpointName={props.pageContext.endpoint.name}
+                />
               </>
             );
           } else {
@@ -111,6 +115,11 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
                   loading={false}
                   signed={signedTransactions}
                   involved={involvedTransactions}
+<<<<<<< HEAD
+=======
+                  missingNonces={missingNonces}
+                  endpointName={props.pageContext.endpoint.name}
+>>>>>>> b8f4235 (Hash search directly into pages)
                 />
               </>
             );
@@ -158,6 +167,7 @@ const AccountPage: React.FC<AccountPageProps> = ({ location }) => {
                 blocks={blocks}
                 loading={loading}
                 columns={accountMineColumns}
+                endpointName={props.pageContext.endpoint.name}
               />
             </>
           );
@@ -173,12 +183,14 @@ interface TransactionListWrapProps {
   signed?: TransactionCommonFragment[];
   involved?: TransactionCommonFragment[];
   loading: boolean;
+  endpointName: string;
 }
 
 const TransactionListWrap: React.FC<TransactionListWrapProps> = ({
   signed,
   involved,
   loading,
+  endpointName,
 }) => (
   <>
     <h2>Signed Transactions{counter(signed)}</h2>
@@ -186,12 +198,14 @@ const TransactionListWrap: React.FC<TransactionListWrapProps> = ({
       loading={loading}
       transactions={signed ? signed : null}
       notFoundMessage={'No Signed Transactions'}
+      endpointName={endpointName}
     />
     <h2>Involved Transactions{counter(involved)}</h2>
     <TransactionList
       loading={loading}
       transactions={involved ? involved : null}
       notFoundMessage={'No Involved Transactions'}
+      endpointName={endpointName}
     />
   </>
 );
@@ -202,24 +216,34 @@ const counter = (items?: unknown[]) =>
 interface TransactionListProps
   extends Omit<OmitListProps, 'columns' | 'items'> {
   transactions: TransactionCommonFragment[] | null;
+  endpointName: string;
 }
 
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
+  endpointName,
   ...props
 }) => (
   <List
     items={transactions}
     {...props}
     columns={txColumns}
-    onItemInvoked={block => navigate(`/search/?${block.hash}`)}
+    onItemInvoked={(transaction: Transaction) =>
+      navigate(`/${endpointName}/transaction/?${transaction.id}`)
+    }
   />
 );
 
-const BlockList: React.FC<BlockListProps> = ({ blocks, ...props }) => (
+const BlockList: React.FC<BlockListProps> = ({
+  blocks,
+  endpointName,
+  ...props
+}) => (
   <List
     items={blocks}
     {...props}
-    onItemInvoked={(block: Block) => navigate(`/search/?${block.hash}`)}
+    onItemInvoked={(block: Block) =>
+      navigate(`/${endpointName}/block/?${block.hash}`)
+    }
   />
 );
