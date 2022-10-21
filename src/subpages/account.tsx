@@ -18,7 +18,7 @@ import { IndexPageProps } from '../pages';
 
 import useQueryString from '../misc/useQueryString';
 import useOffset, { limit } from '../misc/useOffset';
-import { accountMineColumns, txColumns } from '../misc/columns';
+import { accountMineColumns, accountTxColumns } from '../misc/columns';
 
 import styled from '@emotion/styled';
 
@@ -227,7 +227,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   <List
     items={transactions}
     {...props}
-    columns={txColumns}
+    columns={accountTxColumns}
     onItemInvoked={(transaction: Transaction) =>
       navigate(`/${endpointName}/transaction/?${transaction.id}`)
     }
