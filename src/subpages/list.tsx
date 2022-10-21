@@ -3,7 +3,12 @@ import { navigate } from 'gatsby';
 
 import { Checkbox } from '@fluentui/react';
 
-import { Block, BlockListComponent } from '../generated/graphql';
+import {
+  Block,
+  BlockListComponent,
+  Transaction,
+  TransactionListComponent,
+} from '../generated/graphql';
 
 import useOffset, { limit } from '../misc/useOffset';
 import { mainMineColumns } from '../misc/columns';
@@ -21,6 +26,9 @@ const ROUND_DIGITS = 4;
 const ListPage: React.FC<ListPageProps> = ({ location, ...props }) => {
   const [offset, olderHandler, newerHandler] = useOffset(location);
   const [excludeEmptyTxs, setExcludeEmptyTxs] = useState(false);
+  const [blocks, setBlocks] = useState<Block[] | null>(null);
+  const [blocksLoading, setBlocksLoading] = useState(true);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
   return (
     <main>
       <Checkbox
@@ -28,24 +36,37 @@ const ListPage: React.FC<ListPageProps> = ({ location, ...props }) => {
         checked={excludeEmptyTxs}
         onChange={() => setExcludeEmptyTxs(!excludeEmptyTxs)}
       />
+      <SummaryCards blocks={blocks} />
+      <OffsetSwitch
+        olderHandler={olderHandler}
+        newerHandler={newerHandler}
+        disable={{
+          older: blocksLoading || transactionsLoading,
+          newer: blocksLoading || transactionsLoading || offset < 1,
+        }}
+      />
       <BlockListComponent
         variables={{ offset, limit, excludeEmptyTxs }}
         pollInterval={POLL_INTERVAL}>
         {({ data, loading, error }) => {
+          setBlocksLoading(loading);
           if (error) {
             console.error(error);
             return <p>{error.message}</p>;
           }
 
-          let blocks = null;
           if (!loading) {
-            blocks =
-              data && data.chainQuery.blockQuery && data.chainQuery.blockQuery.blocks
+            setBlocks(
+              data &&
+                data.chainQuery.blockQuery &&
+                data.chainQuery.blockQuery.blocks
                 ? (data.chainQuery.blockQuery.blocks as Block[])
-                : null;
+                : null
+            );
           }
 
           return (
+<<<<<<< HEAD
             <>
               <SummaryCards blocks={blocks} />
               <OffsetSwitch
@@ -60,9 +81,40 @@ const ListPage: React.FC<ListPageProps> = ({ location, ...props }) => {
                 endpointName={props.pageContext.endpoint.name}
               />
             </>
+=======
+            <BlockList
+              blocks={blocks}
+              loading={loading}
+              columns={mainMineColumns}
+            />
+>>>>>>> d51f2bc (temp)
           );
         }}
       </BlockListComponent>
+      <TransactionListComponent
+        variables={{ offset, limit, desc: true }}
+        pollInterval={POLL_INTERVAL}>
+        {({ data, loading, error }) => {
+          setTransactionsLoading(loading);
+          if (error) {
+            console.error(error);
+            return <p>{error.message}</p>;
+          }
+
+          let transactions = null;
+          if (!loading) {
+            transactions =
+              data &&
+              data.chainQuery.transactionQuery &&
+              data.chainQuery.transactionQuery.transactions
+                ? (data.chainQuery.transactionQuery
+                    .transactions as Transaction[])
+                : null;
+          }
+
+          return <></>;
+        }}
+      </TransactionListComponent>
     </main>
   );
 };
