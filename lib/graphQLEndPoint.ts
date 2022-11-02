@@ -10,3 +10,12 @@ if (process.env.GRAPHQL_ENDPOINTS === undefined) {
 export const GRAPHQL_ENDPOINTS = JSON.parse(
   process.env.GRAPHQL_ENDPOINTS
 ) as GraphQLEndPoint[];
+
+export function getEndpointByName(name: string) {
+  for (const endpoint of GRAPHQL_ENDPOINTS) {
+    if (endpoint.name === name) {
+      return endpoint;
+    }
+  }
+  return null;
+}
