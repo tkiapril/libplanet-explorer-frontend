@@ -2,6 +2,7 @@ import 'styles/globals.css';
 import App, { AppInitialProps } from 'next/app';
 import type { AppContext, AppProps } from 'next/app';
 import { initializeIcons } from '@fluentui/react';
+import Layout from 'components/Layout';
 import {
   getEndpointByName,
   GraphQLEndPoint,
@@ -13,7 +14,9 @@ initializeIcons();
 
 export default function ExplorerApp({ Component, pageProps }: AppProps) {
   return (
-    <Component {...pageProps} />
+    <Layout {...pageProps}>
+      <Component {...pageProps} />
+    </Layout>
   );
 }
 
