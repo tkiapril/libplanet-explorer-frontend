@@ -1,41 +1,161 @@
 import React, { useState } from 'react';
+import { useQuery } from '@apollo/client';
+import styled from '@emotion/styled';
 import { Checkbox } from '@fluentui/react';
 
-import Wrapper from '../components/Wrapper';
-import { BlockList, TransactionList } from '../components/List';
-import OffsetSwitch from '../components/OffsetSwitch';
+import { BlockList, TransactionList } from 'components/List';
+import OffsetSwitch from 'components/OffsetSwitch';
+import Wrapper from 'components/Wrapper';
+
+import { GraphQLEndPoint } from 'lib/graphQLEndPoint';
+import { accountMineColumns, accountTxColumns } from 'lib/listColumns';
+import useOffset, { limit } from 'lib/useOffset';
+import useIdFromQuery from 'lib/useIdFromQuery';
+import useSearchParams from 'lib/useSearchParams';
 
 import {
-  TransactionsByAccountComponent,
   Block,
-  BlockListComponent,
+  BlockListDocument,
+  BlockListQuery,
+  Transaction,
+  TransactionsByAccountDocument,
+  TransactionsByAccountQuery,
   TransactionCommonFragment,
-} from '../generated/graphql';
+} from 'src/gql/graphql';
 
-import { IndexPageProps } from '../pages';
-
-import useQueryString from '../misc/useQueryString';
-import useOffset, { limit } from '../misc/useOffset';
-import { accountMineColumns, accountTxColumns } from '../misc/columns';
-
-import styled from '@emotion/styled';
-
-type AccountPageProps = IndexPageProps;
+import { ExplorerPageProps } from 'pages/_app';
 
 const Ul = styled.ul`
   list-style: none;
   padding: 0;
 `;
 
-const AccountPage: React.FC<AccountPageProps> = ({ location, ...props }) => {
-  const hash = useQueryString(location)[0].slice(0, 42);
+export default function AccountPage({ endpoint, asPath }: ExplorerPageProps) {
+  let transactionsInfo, blocksInfo;
 
-  const [txOffset, txOlderHandler, txNewerHandler] = useOffset(location, 'tx');
+  const [query] = useSearchParams(asPath);
+  const hash = useIdFromQuery(query);
+
+  const [txOffset, txOlderHandler, txNewerHandler] = useOffset(asPath, 'tx');
   const [mineOffset, mineOlderHandler, mineNewerHandler] = useOffset(
-    location,
+    asPath,
     'mine'
   );
   const [excludeEmptyTxs, setExcludeEmptyTxs] = useState(false);
+  const {
+    loading: transactionsLoading,
+    error: transactionsError,
+    data: transactionsData,
+  } = useQuery<TransactionsByAccountQuery>(TransactionsByAccountDocument, {
+    variables: { offset: txOffset, limit, involvedAddress: hash },
+  });
+  const {
+    loading: blocksLoading,
+    error: blocksError,
+    data: blocksData,
+  } = useQuery<BlockListQuery>(BlockListDocument, {
+    variables: { offset: mineOffset, limit, excludeEmptyTxs, miner: hash },
+  });
+  if (transactionsError) {
+    console.log(transactionsError);
+    transactionsInfo = <p>{transactionsError.message}</p>;
+  } else if (transactionsLoading) {
+    transactionsInfo = (
+      <>
+        <Ul>
+          <li>Signed Transaction: Loading…</li>
+          <li>Involved Transaction: Loading…</li>
+        </Ul>
+        <OffsetSwitch disable={{ older: true, newer: true }} />
+        <TransactionListWrap loading={true} endpoint={endpoint} />
+      </>
+    );
+  } else {
+    const transactionQueryResult =
+      transactionsData?.chainQuery.transactionQuery;
+    const involvedTransactions =
+      transactionQueryResult?.involvedTransactions as Transaction[];
+    const signedTransactions =
+      transactionQueryResult?.signedTransactions as Transaction[];
+
+    if (involvedTransactions === null || signedTransactions === null) {
+      console.log('transactions query failed');
+      transactionsInfo = <p>Failed to retrieve transactions.</p>;
+    }
+
+    transactionsInfo = (
+      <>
+        <Ul>
+          <li>
+            Signed Transaction:{' '}
+            {signedTransactions.length === limit
+              ? (limit - 1).toString() + '+'
+              : signedTransactions.length}
+          </li>
+          <li>
+            Involved Transaction:{' '}
+            {involvedTransactions.length === limit
+              ? (limit - 1).toString() + '+'
+              : involvedTransactions.length}
+          </li>
+        </Ul>
+        <OffsetSwitch
+          olderHandler={txOlderHandler}
+          newerHandler={txNewerHandler}
+          disable={{
+            older:
+              transactionsLoading ||
+              new Set(
+                signedTransactions
+                  .map(tx => tx.id)
+                  .concat(involvedTransactions.map(tx => tx.id))
+              ).size < limit,
+            newer: transactionsLoading || txOffset === 0,
+          }}
+        />
+        <TransactionListWrap
+          loading={false}
+          signed={signedTransactions}
+          involved={involvedTransactions}
+          endpoint={endpoint}
+        />
+      </>
+    );
+  }
+  if (blocksError) {
+    console.error(blocksError);
+    blocksInfo = <p>{blocksError.message}</p>;
+  } else {
+    const blocks = blocksLoading
+      ? null
+      : (blocksData?.chainQuery.blockQuery?.blocks as Block[] | null);
+    blocksInfo = (
+      <>
+        <Checkbox
+          label="Include blocks having any tx"
+          checked={excludeEmptyTxs}
+          disabled={blocksLoading}
+          onChange={() => {
+            setExcludeEmptyTxs(!excludeEmptyTxs);
+          }}
+        />
+        <OffsetSwitch
+          olderHandler={mineOlderHandler}
+          newerHandler={mineNewerHandler}
+          disable={{
+            older: blocksLoading || (!!blocks && blocks.length < limit),
+            newer: blocksLoading || mineOffset === 0,
+          }}
+        />
+        <BlockList
+          blocks={blocks}
+          loading={blocksLoading}
+          columns={accountMineColumns(endpoint)}
+          endpoint={endpoint}
+        />
+      </>
+    );
+  }
   return (
     <Wrapper>
       <h1>Account Details</h1>
@@ -45,166 +165,46 @@ const AccountPage: React.FC<AccountPageProps> = ({ location, ...props }) => {
 
       <h2>Transactions count</h2>
 
-      <TransactionsByAccountComponent
-        variables={{ offset: txOffset, limit, involvedAddress: hash }}>
-        {({ data, loading, error }) => {
-          if (error) {
-            console.error(error);
-            return <p>{error.message}</p>;
-          }
-
-          if (loading) {
-            return (
-              <>
-                <Ul>
-                  <li>Signed Transaction: Loading…</li>
-                  <li>Involved Transaction: Loading…</li>
-                </Ul>
-                <OffsetSwitch disable={{ older: true, newer: true }} />
-                <TransactionListWrap
-                  loading={true}
-                  endpointName={props.pageContext.endpoint.name}
-                />
-              </>
-            );
-          } else {
-            const involvedTransactions =
-              data &&
-              data.chainQuery.transactionQuery &&
-              data.chainQuery.transactionQuery.involvedTransactions
-                ? data.chainQuery.transactionQuery.involvedTransactions
-                : null;
-            const signedTransactions =
-              data &&
-              data.chainQuery.transactionQuery &&
-              data.chainQuery.transactionQuery.signedTransactions
-                ? data.chainQuery.transactionQuery.signedTransactions
-                : null;
-
-            if (involvedTransactions === null || signedTransactions === null) {
-              throw Error('transactions query failed');
-            }
-
-            return (
-              <>
-                <Ul>
-                  <li>
-                    Signed Transaction:{' '}
-                    {signedTransactions.length === limit
-                      ? (limit - 1).toString() + '+'
-                      : signedTransactions.length}
-                  </li>
-                  <li>
-                    Involved Transaction:{' '}
-                    {involvedTransactions.length === limit
-                      ? (limit - 1).toString() + '+'
-                      : involvedTransactions.length}
-                  </li>
-                </Ul>
-                <OffsetSwitch
-                  olderHandler={txOlderHandler}
-                  newerHandler={txNewerHandler}
-                  disable={{
-                    older: loading || new Set(signedTransactions.map(tx => tx.id).concat(involvedTransactions.map(tx => tx.id))).size < limit,
-                    newer: loading || txOffset === 0,
-                  }}
-                />
-                <TransactionListWrap
-                  loading={false}
-                  signed={signedTransactions}
-                  involved={involvedTransactions}
-                  endpointName={props.pageContext.endpoint.name}
-                />
-              </>
-            );
-          }
-        }}
-      </TransactionsByAccountComponent>
+      {transactionsInfo}
       <h2>Mined Blocks</h2>
-      <BlockListComponent
-        variables={{ offset: mineOffset, limit, excludeEmptyTxs, miner: hash }}>
-        {({ data, loading, error }) => {
-          if (error) {
-            console.error(error);
-            return <p>{error.message}</p>;
-          }
-
-          let blocks = null;
-          if (!loading) {
-            blocks =
-              data &&
-              data.chainQuery.blockQuery &&
-              data.chainQuery.blockQuery.blocks
-                ? (data.chainQuery.blockQuery.blocks as Block[])
-                : null;
-          }
-
-          return (
-            <>
-              <Checkbox
-                label="Include blocks having any tx"
-                checked={excludeEmptyTxs}
-                disabled={loading}
-                onChange={() => {
-                  setExcludeEmptyTxs(!excludeEmptyTxs);
-                }}
-              />
-              <OffsetSwitch
-                olderHandler={mineOlderHandler}
-                newerHandler={mineNewerHandler}
-                disable={{
-                  older: loading || (!!blocks && blocks.length < limit),
-                  newer: loading || mineOffset === 0,
-                }}
-              />
-              <BlockList
-                blocks={blocks}
-                loading={loading}
-                columns={(accountMineColumns(props.pageContext.endpoint.name))}
-                endpointName={props.pageContext.endpoint.name}
-              />
-            </>
-          );
-        }}
-      </BlockListComponent>
+      {blocksInfo}
     </Wrapper>
   );
-};
-
-export default AccountPage;
-
-interface TransactionListWrapProps {
-  signed?: TransactionCommonFragment[];
-  involved?: TransactionCommonFragment[];
-  loading: boolean;
-  endpointName: string;
 }
 
-const TransactionListWrap: React.FC<TransactionListWrapProps> = ({
+function TransactionListWrap({
   signed,
   involved,
   loading,
-  endpointName,
-}) => (
-  <>
-    <h2>Signed Transactions{counter(signed)}</h2>
-    <TransactionList
-      loading={loading}
-      transactions={signed ? signed : null}
-      notFoundMessage={'No Signed Transactions'}
-      endpointName={endpointName}
-      columns={accountTxColumns(endpointName)}
-    />
-    <h2>Involved Transactions{counter(involved)}</h2>
-    <TransactionList
-      loading={loading}
-      transactions={involved ? involved : null}
-      notFoundMessage={'No Involved Transactions'}
-      endpointName={endpointName}
-      columns={accountTxColumns(endpointName)}
-    />
-  </>
-);
+  endpoint,
+}: {
+  signed?: TransactionCommonFragment[];
+  involved?: TransactionCommonFragment[];
+  loading: boolean;
+  endpoint: GraphQLEndPoint;
+}) {
+  return (
+    <>
+      <h2>Signed Transactions{counter(signed)}</h2>
+      <TransactionList
+        loading={loading}
+        transactions={signed ? signed : null}
+        notFoundMessage={'No Signed Transactions'}
+        endpoint={endpoint}
+        columns={accountTxColumns(endpoint)}
+      />
+      <h2>Involved Transactions{counter(involved)}</h2>
+      <TransactionList
+        loading={loading}
+        transactions={involved ? involved : null}
+        notFoundMessage={'No Involved Transactions'}
+        endpoint={endpoint}
+        columns={accountTxColumns(endpoint)}
+      />
+    </>
+  );
+}
 
-const counter = (items?: unknown[]) =>
-  items !== undefined && items.length > 0 && `: ${items.length}`;
+function counter(items?: unknown[]) {
+  return items !== undefined && items.length > 0 && `: ${items.length}`;
+}
