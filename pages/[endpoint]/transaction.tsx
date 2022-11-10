@@ -1,16 +1,29 @@
 import React from 'react';
-import useQueryString from '../misc/useQueryString';
-import { TransactionByIdComponent } from '../generated/graphql';
-import { Link } from '@fluentui/react';
-import Timestamp from '../components/Timestamp';
 import { decode, BencodexValue } from 'bencodex';
-import JSONTree from 'react-json-tree';
+import { JSONTree } from 'react-json-tree';
+import { useQuery } from '@apollo/client';
+import Link from 'components/Link';
+import Timestamp from 'components/Timestamp';
+import useSearchParams from 'lib/useSearchParams';
+import useIdFromQuery from 'lib/useIdFromQuery';
+import {
+  Transaction,
+  TransactionByIdDocument,
+  TransactionByIdQuery,
+} from 'src/gql/graphql';
 
-import { IndexPageProps } from '../pages';
+import { ExplorerPageProps } from 'pages/_app';
 
-type TransactionPageProps = IndexPageProps
+type ObjectType =
+  | string
+  | number
+  | boolean
+  | Record<string, unknown>
+  | null
+  | undefined
+  | ObjectType[];
 
-function convertToObject(value: BencodexValue | undefined): string | boolean | number | undefined | null | {} {
+function convertToObject(value: BencodexValue | undefined): ObjectType {
   if (value instanceof Map) {
     return Object.fromEntries(
       Array.from(value).map(v => [v[0], convertToObject(v[1])])
@@ -49,96 +62,95 @@ const jsonTreeTheme = {
   base0F: '#3E965B',
 };
 
-const TransactionPage: React.FC<TransactionPageProps> = ({ location, ...props }) => {
-  const [queryString] = useQueryString(location);
-  const id = queryString;
-  return (
-    <TransactionByIdComponent variables={{ id }}>
-      {({ data, loading, error }) => {
-        if (loading)
-          return (
-            <>
-              <h2>Transaction Details</h2>
-              <p>Loading&hellip;</p>
-            </>
-          );
-        if (error)
-          return (
-            <>
-              <h2>Transaction Details</h2>
-              <p>
-                Failed to load {id} - {JSON.stringify(error.message)}
-              </p>
-            </>
-          );
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const { transaction } = data!.chainQuery.transactionQuery!;
-        if (!transaction)
-          return (
-            <>
-              <h2>Transaction Details</h2>
-              <p>
-                No such transaction: <code>{id}</code>
-              </p>
-            </>
-          );
-
-        const actions = transaction.actions.map(action => (
-          <dd key={action.raw}>
-            <JSONTree
-              data={convertToObject(decode(Buffer.from(action.raw, 'base64')))}
-              theme={jsonTreeTheme}
-              invertTheme={false}
-              hideRoot={true}
-            />
-          </dd>
-        ));
-
-        const signerLink = `/${props.pageContext.endpoint.name}/account/?${transaction.signer}`;
-        return (
-          <>
-            <h2>Transaction Details</h2>
-            <dl>
-              <dt>Id</dt>
-              <dd>
-                <code>{transaction.id}</code>
-              </dd>
-              <dt>Nonce</dt>
-              <dd>{transaction.nonce} </dd>
-              <dt>Public Key</dt>
-              <dd>
-                <code>{transaction.publicKey}</code>
-              </dd>
-              <dt>Signature</dt>
-              <dd>
-                <code>{transaction.signature}</code>
-              </dd>
-              <dt>Signer</dt>
-              <dd>
-                <Link href={signerLink}>
-                  <code>{transaction.signer}</code>
-                </Link>
-              </dd>
-              <dt>Timestamp</dt>
-              <dd>
-                <Timestamp timestamp={transaction.timestamp} />
-              </dd>
-              <dt>Updated Addresses</dt>
-              {transaction.updatedAddresses.map(address => (
-                <dd key={address}>
-                  <Link href={`/${props.pageContext.endpoint.name}/account/?${address}`}>
-                    <code>{address}</code>
-                  </Link>
-                </dd>
-              ))}
-              <dt>Actions</dt>
-              {actions}
-            </dl>
-          </>
-        );
-      }}
-    </TransactionByIdComponent>
+export default function TransactionPage({
+  endpoint,
+  asPath,
+}: ExplorerPageProps) {
+  const [query] = useSearchParams(asPath);
+  const id = useIdFromQuery(query);
+  const { data, loading, error } = useQuery<TransactionByIdQuery>(
+    TransactionByIdDocument,
+    { variables: { id } }
   );
-};
-
-export default TransactionPage;
+  if (error) {
+    return (
+      <>
+        <h2>Transaction Details</h2>
+        <p>
+          Failed to load {id} - {JSON.stringify(error.message)}
+        </p>
+      </>
+    );
+  }
+  if (loading) {
+    return (
+      <>
+        <h2>Transaction Details</h2>
+        <p>Loading&hellip;</p>
+      </>
+    );
+  }
+  const transaction = data?.chainQuery.transactionQuery
+    ?.transaction as Transaction;
+  if (!transaction) {
+    return (
+      <>
+        <h2>Transaction Details</h2>
+        <p>
+          No such transaction: <code>{id}</code>
+        </p>
+      </>
+    );
+  }
+  const actions = transaction.actions.map(action => (
+    <dd key={action.raw}>
+      <JSONTree
+        data={convertToObject(decode(Buffer.from(action.raw, 'base64')))}
+        theme={jsonTreeTheme}
+        invertTheme={false}
+        hideRoot={true}
+      />
+    </dd>
+  ));
+  return (
+    <>
+      <h2>Transaction Details</h2>
+      <dl>
+        <dt>Id</dt>
+        <dd>
+          <code>{transaction.id}</code>
+        </dd>
+        <dt>Nonce</dt>
+        <dd>{transaction.nonce} </dd>
+        <dt>Public Key</dt>
+        <dd>
+          <code>{transaction.publicKey}</code>
+        </dd>
+        <dt>Signature</dt>
+        <dd>
+          <code>{transaction.signature}</code>
+        </dd>
+        <dt>Signer</dt>
+        <dd>
+          <Link href={`/${endpoint.name}/account/?${transaction.signer}`}>
+            <code>{transaction.signer}</code>
+          </Link>
+        </dd>
+        <dt>Timestamp</dt>
+        <dd>
+          <Timestamp timestamp={transaction.timestamp} />
+        </dd>
+        <dt>Updated Addresses</dt>
+        {transaction.updatedAddresses.map(address => (
+          <dd key={address}>
+            <Link href={`/${endpoint.name}/account/?${address}`}>
+              <code>{address}</code>
+            </Link>
+          </dd>
+        ))}
+        <dt>Actions</dt>
+        {actions}
+      </dl>
+    </>
+  );
+}
