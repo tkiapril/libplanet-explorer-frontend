@@ -44,7 +44,7 @@ export default function Summary({ staticEndpoint }: CommonPageProps) {
   } = useQuery<BlockListQuery>(BlockListDocument, {
     variables: { offset, limit, excludeEmptyTxs },
     pollInterval: POLL_INTERVAL,
-    skip: isReady,
+    skip: !endpoint,
   });
   const {
     loading: transactionsLoading,
@@ -53,7 +53,7 @@ export default function Summary({ staticEndpoint }: CommonPageProps) {
   } = useQuery<TransactionListQuery>(TransactionListDocument, {
     variables: { offset, limit, desc: true },
     pollInterval: POLL_INTERVAL,
-    skip: isReady,
+    skip: !endpoint,
   });
   useEffect(() => {
     if (!isReady) {
