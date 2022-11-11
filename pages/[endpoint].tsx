@@ -28,8 +28,8 @@ const POLL_INTERVAL = 2000;
 const ROUND_DIGITS = 4;
 
 export default function Summary({ staticEndpoint }: CommonPageProps) {
-  const [blocks, setBlocks] = useState<Block[] | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[] | null>(null);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [blockList, setBlockList] = useState<JSX.Element>(<></>);
   const [transactionList, setTransactionList] = useState<JSX.Element>(<></>);
   const [endpoint, setEndpoint] = useState(GRAPHQL_ENDPOINTS[0]);
@@ -67,7 +67,9 @@ export default function Summary({ staticEndpoint }: CommonPageProps) {
       setBlockList(<p>{blocksError.message}</p>);
     } else {
       if (!blocksLoading) {
-        setBlocks(blocksData?.chainQuery.blockQuery?.blocks as Block[] | null);
+        setBlocks(
+          (blocksData?.chainQuery.blockQuery?.blocks as Block[] | null) ?? []
+        );
       }
       setBlockList(
         <BlockList
@@ -84,9 +86,9 @@ export default function Summary({ staticEndpoint }: CommonPageProps) {
     } else {
       if (!transactionsLoading) {
         setTransactions(
-          transactionsData?.chainQuery.transactionQuery?.transactions as
+          (transactionsData?.chainQuery.transactionQuery?.transactions as
             | Transaction[]
-            | null
+            | null) ?? []
         );
       }
       setTransactionList(
@@ -137,8 +139,8 @@ export default function Summary({ staticEndpoint }: CommonPageProps) {
   );
 }
 
-function SummaryCards({ blocks }: { blocks: Block[] | null }) {
-  if (blocks === null)
+function SummaryCards({ blocks }: { blocks: Block[] }) {
+  if (!blocks)
     return <Cards interval={0} difficultyAverage={0} totalTxNumber={0} />;
 
   const timestamps: Date[] = blocks.map(block => new Date(block.timestamp));
