@@ -1,3 +1,5 @@
+import { ParsedUrlQuery } from 'querystring';
+
 export interface GraphQLEndPoint {
   name: string;
   uri: string;
@@ -18,4 +20,14 @@ export function getEndpointByName(name: string) {
     }
   }
   return null;
+}
+
+export function getEndpointFromQuery(
+  query: ParsedUrlQuery | undefined
+) {
+  return query?.endpoint
+    ? Array.isArray(query?.endpoint)
+      ? getEndpointByName(query?.endpoint[-1])
+      : getEndpointByName(query?.endpoint)
+    : null;
 }

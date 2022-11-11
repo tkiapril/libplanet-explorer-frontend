@@ -1,4 +1,4 @@
-import React from 'react';
+/*import React from 'react';
 import { decode, BencodexValue } from 'bencodex';
 import { JSONTree } from 'react-json-tree';
 import { useQuery } from '@apollo/client';
@@ -154,3 +154,4 @@ export default function TransactionPage({
     </>
   );
 }
+*/

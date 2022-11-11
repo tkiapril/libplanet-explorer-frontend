@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { useQuery } from '@apollo/client';
 import { Checkbox, Pivot, PivotItem } from '@fluentui/react';
 
 import { BlockList, TransactionList } from 'components/List';
 import OffsetSwitch from 'components/OffsetSwitch';
 
+import {
+  CommonPageProps,
+  getCommonStaticPaths as getStaticPaths,
+  getCommonStaticProps as getStaticProps,
+} from 'lib/staticGeneration';
+import { getEndpointFromQuery, GRAPHQL_ENDPOINTS } from 'lib/graphQLEndPoint';
 import { listTxColumns, mainMineColumns } from 'lib/listColumns';
 import useOffset, { limit } from 'lib/useOffset';
+import useSearchParams from 'lib/useSearchParams';
 
 import {
   Block,
@@ -16,17 +24,17 @@ import {
   TransactionListDocument,
   TransactionListQuery,
 } from 'src/gql/graphql';
-
-import { ExplorerPageProps } from 'pages/_app';
-
 const POLL_INTERVAL = 2000;
 const ROUND_DIGITS = 4;
 
-export default function Summary({ endpoint, asPath }: ExplorerPageProps) {
-  let blocks = null,
-    blockList,
-    transactions = null,
-    transactionList;
+export default function Summary({ staticEndpoint }: CommonPageProps) {
+  const [blocks, setBlocks] = useState<Block[] | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[] | null>(null);
+  const [blockList, setBlockList] = useState<JSX.Element>(<></>);
+  const [transactionList, setTransactionList] = useState<JSX.Element>(<></>);
+  const [endpoint, setEndpoint] = useState(GRAPHQL_ENDPOINTS[0]);
+  const { isReady, asPath } = useRouter();
+  const [query] = useSearchParams(asPath);
   const [offset, olderHandler, newerHandler] = useOffset(asPath);
   const [excludeEmptyTxs, setExcludeEmptyTxs] = useState(false);
   const {
@@ -36,6 +44,7 @@ export default function Summary({ endpoint, asPath }: ExplorerPageProps) {
   } = useQuery<BlockListQuery>(BlockListDocument, {
     variables: { offset, limit, excludeEmptyTxs },
     pollInterval: POLL_INTERVAL,
+    skip: isReady,
   });
   const {
     loading: transactionsLoading,
@@ -44,40 +53,66 @@ export default function Summary({ endpoint, asPath }: ExplorerPageProps) {
   } = useQuery<TransactionListQuery>(TransactionListDocument, {
     variables: { offset, limit, desc: true },
     pollInterval: POLL_INTERVAL,
+    skip: isReady,
   });
-  if (blocksError) {
-    console.error(blocksError);
-    blockList = <p>{blocksError.message}</p>;
-  } else {
-    if (!blocksLoading) {
-      blocks = blocksData?.chainQuery.blockQuery?.blocks as Block[] | null;
+  useEffect(() => {
+    if (!isReady) {
+      return;
     }
-    blockList = (
-      <BlockList
-        blocks={blocks}
-        loading={blocksLoading}
-        columns={mainMineColumns(endpoint)}
-        endpoint={endpoint}
-      />
+    setEndpoint(
+      staticEndpoint ?? getEndpointFromQuery(query) ?? GRAPHQL_ENDPOINTS[0]
     );
-  }
-  if (transactionsError) {
-    console.error(transactionsError);
-    transactionList = <p>{transactionsError.message}</p>;
-  } else {
-    if (!transactionsLoading) {
-      transactions = transactionsData?.chainQuery.transactionQuery
-        ?.transactions as Transaction[] | null;
+    if (blocksError) {
+      console.error(blocksError);
+      setBlockList(<p>{blocksError.message}</p>);
+    } else {
+      if (!blocksLoading) {
+        setBlocks(blocksData?.chainQuery.blockQuery?.blocks as Block[] | null);
+      }
+      setBlockList(
+        <BlockList
+          blocks={blocks}
+          loading={blocksLoading}
+          columns={mainMineColumns(endpoint)}
+          endpoint={endpoint}
+        />
+      );
     }
-    transactionList = (
-      <TransactionList
-        columns={listTxColumns(endpoint)}
-        endpoint={endpoint}
-        loading={transactionsLoading}
-        transactions={transactions}
-      />
-    );
-  }
+    if (transactionsError) {
+      console.error(transactionsError);
+      setTransactionList(<p>{transactionsError.message}</p>);
+    } else {
+      if (!transactionsLoading) {
+        setTransactions(
+          transactionsData?.chainQuery.transactionQuery?.transactions as
+            | Transaction[]
+            | null
+        );
+      }
+      setTransactionList(
+        <TransactionList
+          columns={listTxColumns(endpoint)}
+          endpoint={endpoint}
+          loading={transactionsLoading}
+          transactions={transactions}
+        />
+      );
+    }
+  }, [
+    blocks,
+    blocksData?.chainQuery.blockQuery?.blocks,
+    blocksError,
+    blocksLoading,
+    endpoint,
+    isReady,
+    query,
+    staticEndpoint,
+    transactions,
+    transactionsData?.chainQuery.transactionQuery?.transactions,
+    transactionsError,
+    transactionsLoading,
+  ]);
+
   return (
     <main>
       <Checkbox
@@ -155,3 +190,5 @@ function Cards({
     </div>
   );
 }
+
+export { getStaticProps, getStaticPaths };

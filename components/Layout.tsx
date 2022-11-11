@@ -17,7 +17,11 @@ import {
   TooltipHost,
 } from '@fluentui/react';
 
-import { GraphQLEndPoint, GRAPHQL_ENDPOINTS } from 'lib/graphQLEndPoint';
+import {
+  getEndpointFromQuery,
+  GraphQLEndPoint,
+  GRAPHQL_ENDPOINTS,
+} from 'lib/graphQLEndPoint';
 import {
   BlockByIndexQuery,
   BlockByIndexDocument,
@@ -29,16 +33,24 @@ import {
 
 import Wrapper from 'components/Wrapper';
 import useIdFromQuery from 'lib/useIdFromQuery';
+import { CommonPageProps } from 'lib/staticGeneration';
 
 export default function Layout({
   children,
-  endpoint,
-}: {
+  staticEndpoint,
+}: CommonPageProps & {
   children: ReactNode;
-  endpoint: GraphQLEndPoint | null;
 }) {
+  const { isReady, query } = useRouter();
+  const [endpoint, setEndpoint] = useState(staticEndpoint);
   const [client, setClient] = useState<ApolloClient<object> | null>(null);
   useEffect(() => {
+    if (!endpoint) {
+      if (!isReady) {
+        return;
+      }
+      setEndpoint(getEndpointFromQuery(query));
+    }
     setClient(
       new ApolloClient({
         cache: new InMemoryCache(),

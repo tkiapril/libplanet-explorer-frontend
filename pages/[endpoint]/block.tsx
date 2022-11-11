@@ -1,4 +1,4 @@
-import React from 'react';
+/*import React from 'react';
 import { useQuery } from '@apollo/client';
 import Link from 'components/Link';
 import { TransactionList } from 'components/List';
@@ -114,3 +114,4 @@ export default function BlockPage({ endpoint, asPath }: ExplorerPageProps) {
     </>
   );
 }
+*/
