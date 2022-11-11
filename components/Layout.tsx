@@ -28,6 +28,7 @@ import {
 } from 'src/gql/graphql';
 
 import Wrapper from 'components/Wrapper';
+import useIdFromQuery from 'lib/useIdFromQuery';
 
 export default function Layout({
   children,
@@ -68,7 +69,12 @@ const dropdownStyles: Partial<IDropdownStyles> = {
 
 export function NavBar({ endpoint }: { endpoint: GraphQLEndPoint }) {
   const client = useApolloClient();
-  const { push } = useRouter();
+  const { push, query } = useRouter();
+  const [searchBoxValue, setSearchBoxValue] = useState('');
+  const queriedId = useIdFromQuery(query);
+  useEffect(() => {
+    setSearchBoxValue(queriedId ?? '');
+  }, [queriedId]);
   const onSearch = async (value: string) => {
     value = value.trim();
     if (value.match(/^[0-9a-fA-F]{64}$/)) {
@@ -162,7 +168,13 @@ export function NavBar({ endpoint }: { endpoint: GraphQLEndPoint }) {
         </LogoLink>
         <NavSearchBox
           placeholder="Block Hash / Block Index / TxID / Address starting with 0x"
+          onChange={e => {
+            if (e) {
+              setSearchBoxValue(e.target.value);
+            }
+          }}
           onSearch={onSearch}
+          value={searchBoxValue}
         />
         <NetworkNameContainer>
           <Dropdown
