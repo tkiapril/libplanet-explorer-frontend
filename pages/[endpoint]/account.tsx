@@ -7,6 +7,9 @@ import { BlockList, TransactionList } from 'components/List';
 import OffsetSwitch from 'components/OffsetSwitch';
 import Wrapper from 'components/Wrapper';
 
+import getServerSideProps, {
+  CommonPageProps,
+} from 'lib/getCommonServerSideProps';
 import { GraphQLEndPoint } from 'lib/graphQLEndPoint';
 import { accountMineColumns, accountTxColumns } from 'lib/listColumns';
 import useOffset, { limit } from 'lib/useOffset';
@@ -23,22 +26,26 @@ import {
   TransactionCommonFragment,
 } from 'src/gql/graphql';
 
-import { ExplorerPageProps } from 'pages/_app';
-
 const Ul = styled.ul`
   list-style: none;
   padding: 0;
 `;
 
-export default function AccountPage({ endpoint, asPath }: ExplorerPageProps) {
+export default function AccountPage({
+  endpoint,
+  resolvedUrl,
+}: CommonPageProps) {
   let transactionsInfo, blocksInfo;
 
-  const [query] = useSearchParams(asPath);
+  const [query] = useSearchParams(resolvedUrl);
   const hash = useIdFromQuery(query);
 
-  const [txOffset, txOlderHandler, txNewerHandler] = useOffset(asPath, 'tx');
+  const [txOffset, txOlderHandler, txNewerHandler] = useOffset(
+    resolvedUrl,
+    'tx'
+  );
   const [mineOffset, mineOlderHandler, mineNewerHandler] = useOffset(
-    asPath,
+    resolvedUrl,
     'mine'
   );
   const [excludeEmptyTxs, setExcludeEmptyTxs] = useState(false);
@@ -208,3 +215,5 @@ function TransactionListWrap({
 function counter(items?: unknown[]) {
   return items !== undefined && items.length > 0 && `: ${items.length}`;
 }
+
+export { getServerSideProps };

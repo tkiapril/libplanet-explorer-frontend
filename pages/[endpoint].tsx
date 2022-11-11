@@ -5,6 +5,9 @@ import { Checkbox, Pivot, PivotItem } from '@fluentui/react';
 import { BlockList, TransactionList } from 'components/List';
 import OffsetSwitch from 'components/OffsetSwitch';
 
+import getServerSideProps, {
+  CommonPageProps,
+} from 'lib/getCommonServerSideProps';
 import { listTxColumns, mainMineColumns } from 'lib/listColumns';
 import useOffset, { limit } from 'lib/useOffset';
 
@@ -17,17 +20,15 @@ import {
   TransactionListQuery,
 } from 'src/gql/graphql';
 
-import { ExplorerPageProps } from 'pages/_app';
-
 const POLL_INTERVAL = 2000;
 const ROUND_DIGITS = 4;
 
-export default function Summary({ endpoint, asPath }: ExplorerPageProps) {
+export default function Summary({ endpoint, resolvedUrl }: CommonPageProps) {
   let blocks = null,
     blockList,
     transactions = null,
     transactionList;
-  const [offset, olderHandler, newerHandler] = useOffset(asPath);
+  const [offset, olderHandler, newerHandler] = useOffset(resolvedUrl);
   const [excludeEmptyTxs, setExcludeEmptyTxs] = useState(false);
   const {
     loading: blocksLoading,
@@ -155,3 +156,5 @@ function Cards({
     </div>
   );
 }
+
+export { getServerSideProps };

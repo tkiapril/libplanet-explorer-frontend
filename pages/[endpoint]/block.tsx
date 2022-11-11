@@ -3,6 +3,9 @@ import { useQuery } from '@apollo/client';
 import Link from 'components/Link';
 import { TransactionList } from 'components/List';
 import Timestamp from 'components/Timestamp';
+import getServerSideProps, {
+  CommonPageProps,
+} from 'lib/getCommonServerSideProps';
 import { listTxColumns } from 'lib/listColumns';
 import useIdFromQuery from 'lib/useIdFromQuery';
 import useSearchParams from 'lib/useSearchParams';
@@ -12,10 +15,9 @@ import {
   BlockByHashQuery,
   Transaction,
 } from 'src/gql/graphql';
-import { ExplorerPageProps } from 'pages/_app';
 
-export default function BlockPage({ endpoint, asPath }: ExplorerPageProps) {
-  const [query] = useSearchParams(asPath);
+export default function BlockPage({ endpoint, resolvedUrl }: CommonPageProps) {
+  const [query] = useSearchParams(resolvedUrl);
   const hash = useIdFromQuery(query);
   const { loading, error, data } = useQuery<BlockByHashQuery>(
     BlockByHashDocument,
@@ -114,3 +116,5 @@ export default function BlockPage({ endpoint, asPath }: ExplorerPageProps) {
     </>
   );
 }
+
+export { getServerSideProps };

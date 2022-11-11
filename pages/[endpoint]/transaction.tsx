@@ -4,6 +4,9 @@ import { JSONTree } from 'react-json-tree';
 import { useQuery } from '@apollo/client';
 import Link from 'components/Link';
 import Timestamp from 'components/Timestamp';
+import getServerSideProps, {
+  CommonPageProps,
+} from 'lib/getCommonServerSideProps';
 import useSearchParams from 'lib/useSearchParams';
 import useIdFromQuery from 'lib/useIdFromQuery';
 import {
@@ -11,8 +14,6 @@ import {
   TransactionByIdDocument,
   TransactionByIdQuery,
 } from 'src/gql/graphql';
-
-import { ExplorerPageProps } from 'pages/_app';
 
 type ObjectType =
   | string
@@ -64,9 +65,9 @@ const jsonTreeTheme = {
 
 export default function TransactionPage({
   endpoint,
-  asPath,
-}: ExplorerPageProps) {
-  const [query] = useSearchParams(asPath);
+  resolvedUrl,
+}: CommonPageProps) {
+  const [query] = useSearchParams(resolvedUrl);
   const id = useIdFromQuery(query);
   const { data, loading, error } = useQuery<TransactionByIdQuery>(
     TransactionByIdDocument,
@@ -154,3 +155,5 @@ export default function TransactionPage({
     </>
   );
 }
+
+export { getServerSideProps };
